@@ -3,6 +3,9 @@ interface WalletUser {
   id: string;
   address: string;
   username?: string;
+  displayName?: string;
+  fid?: number;
+  pfpUrl?: string;
 }
 
 // Get user ID from localStorage or generate one
@@ -35,19 +38,44 @@ export function getCurrentUser(): WalletUser | null {
   return {
     id: userId,
     address: walletAddress,
-    username: localStorage.getItem('username') || undefined
+    username: localStorage.getItem('username') || undefined,
+    displayName: localStorage.getItem('displayName') || undefined,
+    fid: localStorage.getItem('fid') ? Number(localStorage.getItem('fid')) : undefined,
+    pfpUrl: localStorage.getItem('pfpUrl') || undefined
   };
 }
 
-// Save wallet address to localStorage
-export function saveWalletConnection(address: string): WalletUser {
+// Save wallet connection to localStorage with Farcaster context data if available
+export function saveWalletConnection(address: string, farcasterUser?: { 
+  fid?: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+}): WalletUser {
   const userId = getUserId();
   localStorage.setItem('wallet_address', address);
+  
+  // Save Farcaster user data if available
+  if (farcasterUser) {
+    if (farcasterUser.username) {
+      localStorage.setItem('username', farcasterUser.username);
+    }
+    if (farcasterUser.displayName) {
+      localStorage.setItem('displayName', farcasterUser.displayName);
+    }
+    if (farcasterUser.fid) {
+      localStorage.setItem('fid', farcasterUser.fid.toString());
+    }
+    if (farcasterUser.pfpUrl) {
+      localStorage.setItem('pfpUrl', farcasterUser.pfpUrl);
+    }
+  }
   
   // Return user object
   return {
     id: userId,
-    address
+    address,
+    ...farcasterUser
   };
 }
 
@@ -60,4 +88,7 @@ export function saveUsername(username: string): void {
 export function disconnectWallet(): void {
   localStorage.removeItem('wallet_address');
   localStorage.removeItem('username');
+  localStorage.removeItem('displayName');
+  localStorage.removeItem('fid');
+  localStorage.removeItem('pfpUrl');
 } 

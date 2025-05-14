@@ -1,11 +1,11 @@
 import { createPublicClient, createWalletClient, http, Address, Hex } from "viem";
 import { base } from "viem/chains";
-import { createCoin, validateMetadataJSON } from "@zoralabs/coins-sdk";
+import { createCoin, validateMetadataJSON, createCoinCall, getCoinCreateFromLogs } from "@zoralabs/coins-sdk";
 
 // Create the public client for reading from the blockchain
 export const publicClient = createPublicClient({
   chain: base,
-  transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://goerli.base.org"),
+  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL),
 });
 
 // Create a metadata object for a song meaning
@@ -42,6 +42,42 @@ export function createSongMeaningMetadata(data: {
   }
 }
 
+// Generate parameters for creating a song meaning coin with Wagmi
+export async function generateSongCoinParams(data: {
+  songName: string;
+  artistName: string;
+  meaning: string;
+  albumImageUrl?: string;
+  username: string;
+  walletAddress: Address;
+}) {
+  // Create metadata
+  const metadata = createSongMeaningMetadata(data);
+  
+  // Generate a symbol (up to 5 chars) based on song name + artist
+  const symbolBase = `${data.songName}${data.artistName}`
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+  const symbol = symbolBase.slice(0, 5);
+  
+  // Create coin parameters
+  const coinParams = {
+    name: `${data.songName} by ${data.artistName}`,
+    symbol,
+    uri: `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`,
+    payoutRecipient: data.walletAddress,
+    initialPurchaseWei: 0n,
+  };
+  
+  // Generate Wagmi contract call parameters
+  return await createCoinCall(coinParams);
+}
+
+// Function to extract coin address from transaction receipt
+export function getCoinAddressFromReceipt(receipt: any) {
+  return getCoinCreateFromLogs(receipt)?.coin;
+}
+
 // Function to mint a content coin using a private key (should only be used server-side!)
 export async function mintContentCoin(
   coinName: string,
@@ -53,7 +89,7 @@ export async function mintContentCoin(
   const walletClient = createWalletClient({
     account: privateKey,
     chain: base,
-    transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://goerli.base.org"),
+    transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL),
   });
 
   // Get the account address

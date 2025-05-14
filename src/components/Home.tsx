@@ -7,63 +7,39 @@ import { MusicCard } from "~/components/music-card"
 import { AddSongModal } from "~/components/add-song-modal"
 import { Plus } from "lucide-react"
 import axios from "axios"
-import { getUserId, getCurrentUser, saveWalletConnection, saveUsername } from "~/lib/user"
+import { getUserId, getCurrentUser, saveWalletConnection } from "~/lib/user"
 import { LoadingSkeleton } from "~/components/loading-skeleton"
 import { SiteBanner } from "~/components/site-banner"
 import Link from "next/link"
+import { useAccount, useConnect } from 'wagmi'
 
-// Simple username claim modal component
-const UsernameClaimModal = ({ isOpen, onComplete, user }: { 
-  isOpen: boolean, 
-  onComplete: (username: string) => void, 
-  user: User 
-}) => {
-  const [username, setUsername] = useState("");
-
-  if (!isOpen) return null;
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username.trim()) {
-      onComplete(username);
-    }
-  };
-  
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Claim Your Username</h2>
-        <p className="mb-4">Choose a username for wallet {user.address.substring(0, 6)}...{user.address.substring(user.address.length - 4)}</p>
-        
-        <form onSubmit={handleSubmit}>
-          <Input
-            type="text"
-            placeholder="Enter username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="mb-4"
-            required
-          />
-          
-          <div className="flex gap-4 justify-end mt-6">
-            <Button 
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              Save Username
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+// Define Farcaster types for TypeScript
+declare global {
+  interface Window {
+    farcaster?: {
+      sdk?: {
+        context?: {
+          user?: {
+            fid: number;
+            username?: string;
+            displayName?: string;
+            pfpUrl?: string;
+          };
+        };
+        wallet?: any;
+      };
+    };
+  }
+}
 
 // Define our own simpler User type 
 interface User {
   id: string
   address: string
   username?: string
+  displayName?: string
+  fid?: number
+  pfpUrl?: string
 }
 
 interface Track {
@@ -108,6 +84,21 @@ const WalletLink = ({ address, username, showIcon = true, className = "" }: Wall
   );
 };
 
+const WalletConnectButton = () => {
+  const { isConnected } = useAccount()
+  const { connect, connectors } = useConnect()
+
+  if (isConnected) {
+    return null; // Don't show button if already connected
+  }
+
+  return (
+    <div onClick={() => connect({ connector: connectors[0] })} style={{ cursor: 'pointer' }}>
+      <SiteBanner message="👉 Connect your wallet to build your music scrapbook. 👈" />
+    </div>
+  );
+};
+
 export default function Home() {
   const [stories, setStories] = useState<any[]>([])
   const [totalSongs, setTotalSongs] = useState(0)
@@ -117,7 +108,6 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSong, setSelectedSong] = useState<any>(null)
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [showStickySearch, setShowStickySearch] = useState(false)
   const [showFloatingSearch, setShowFloatingSearch] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -126,7 +116,6 @@ export default function Home() {
   const [showSearchInput, setShowSearchInput] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
   const [user, setUser] = useState<User | null>(null)
-  const [showUsernameModal, setShowUsernameModal] = useState(false)
 
   // Handle scroll to show/hide floating button
   useEffect(() => {
@@ -166,17 +155,36 @@ export default function Home() {
     }
   }, [showFloatingSearch])
 
-  // Get wallet user
+  // Check for Farcaster context and get user info
   useEffect(() => {
-    // Get user from localStorage
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
+    const checkFarcasterContext = () => {
+      // Check if Farcaster SDK is available
+      if (typeof window !== 'undefined' && window.farcaster && window.farcaster.sdk && window.farcaster.sdk.context) {
+        // If user context is available, use it for authentication
+        const farcasterUser = window.farcaster.sdk.context.user;
+        if (farcasterUser && farcasterUser.fid) {
+          // Create wallet address from FID
+          const walletAddress = `0x${farcasterUser.fid.toString(16).padStart(40, '0')}`;
+          
+          // Save Farcaster user info in localStorage
+          const savedUser = saveWalletConnection(walletAddress, {
+            fid: farcasterUser.fid,
+            username: farcasterUser.username,
+            displayName: farcasterUser.displayName,
+            pfpUrl: farcasterUser.pfpUrl
+          });
+          
+          setUser(savedUser);
+        }
+      } else {
+        // Fallback to localStorage if Farcaster context not available
+        const currentUser = getCurrentUser();
+        setUser(currentUser);
+      }
+    };
     
-    // Show username modal if wallet is connected but no username
-    if (currentUser && !currentUser.username) {
-      setShowUsernameModal(true);
-    }
-  }, [])
+    checkFarcasterContext();
+  }, []);
 
   const fetchSongs = async (page: number, append = false) => {
     try {
@@ -274,23 +282,18 @@ export default function Home() {
 
       const savedSong = response.data
 
+      // Add the new song to the stories list
       setStories(prevStories => [savedSong, ...prevStories])
       setTotalSongs(prev => prev + 1)
       
-      setIsModalOpen(false)
-      setSelectedSong(null)
-
-      setShowSuccessMessage(true)
-      setTimeout(() => {
-        setShowSuccessMessage(false)
-      }, 3000)
-
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      })
+      // Return the saved song data so the AddSongModal can show success state
+      return savedSong;
+      
+      // DON'T close the modal here - let the AddSongModal handle its own state
+      // The modal will show success options for sharing and minting
     } catch (error) {
       console.error('Error saving song:', error)
+      throw error; // Rethrow so the modal can handle the error
     }
   }
 
@@ -399,47 +402,10 @@ export default function Home() {
     )
   }
 
-  const handleConnectWallet = async () => {
-    try {
-      // Sample implementation - replace with your actual wallet connection code
-      // This could be connecting to MetaMask, WalletConnect, etc.
-      // For now we'll simulate with a random address
-      const randomAddress = `0x${Array.from({length: 40}, () => 
-        Math.floor(Math.random() * 16).toString(16)).join('')}`;
-      
-      // Save wallet connection to localStorage
-      const user = saveWalletConnection(randomAddress);
-      setUser(user);
-      
-      // In a real implementation, you would trigger your wallet provider here
-      // e.g., await window.ethereum.request({ method: 'eth_requestAccounts' })
-    } catch (error) {
-      console.error('Error connecting wallet:', error)
-    }
-  }
-
-  const handleUsernameClaimed = async (newUsername: string) => {
-    setShowUsernameModal(false)
-    
-    // Save username to localStorage
-    saveUsername(newUsername);
-    
-    // Update user state
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      currentUser.username = newUsername;
-      setUser(currentUser);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[#FFF8E1]">
       {/* Banner at the very top - only show if not logged in */}
-      {!user && (
-        <div onClick={handleConnectWallet} style={{ cursor: 'pointer' }}>
-          <SiteBanner message="👉 Connect your wallet to build your music scrapbook. 👈" />
-        </div>
-      )}
+      {!user && <WalletConnectButton />}
 
       {/* Header with profile dropdown if logged in */}
       <header className="fixed top-4 md:top-6 right-0 left-0 z-50 flex items-center justify-end px-6 md:px-8 bg-transparent">
@@ -489,13 +455,6 @@ export default function Home() {
           </>
         )}
 
-        {/* Success message */}
-        {showSuccessMessage && (
-          <div className="fixed top-4 right-4 z-50 rounded-md bg-green-100 p-4 shadow-md font-sans">
-            <p className="text-green-800">Your story has been added to the wall!</p>
-          </div>
-        )}
-
         <div className="mx-auto max-w-6xl">
           <section className="mb-12">
             {isLoadingStories ? (
@@ -542,15 +501,6 @@ export default function Home() {
         onSongSelect={() => {}}
         onAddStory={handleAddStory}
       />
-
-      {/* Username Claim Modal */}
-      {user && (
-        <UsernameClaimModal
-          isOpen={showUsernameModal}
-          onComplete={handleUsernameClaimed}
-          user={user}
-        />
-      )}
 
       {/* Simple footer */}
       {/* <footer className="px-4 py-4 md:py-6 text-center text-sm text-[#666] font-sans">
