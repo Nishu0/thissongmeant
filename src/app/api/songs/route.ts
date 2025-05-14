@@ -29,33 +29,67 @@ export async function GET(request: NextRequest) {
       };
     }
     
-    // Get songs with pagination
-    const songs = await prisma.song.findMany({
-      where: whereClause,
-      orderBy: {
-        created_at: 'desc'
-      },
-      take: limit,
-      skip: skip
-    });
+    console.log("Attempting to fetch songs with whereClause:", JSON.stringify(whereClause));
+    console.log("Using pagination - page:", page, "limit:", limit, "skip:", skip);
     
-    // Get the total count for statistics and pagination
-    const total = await prisma.song.count({
-      where: whereClause
-    });
-    
-    // Calculate if there are more results
-    const hasMore = total > skip + songs.length;
-    
-    // Return using the exact format requested - raw database format
-    return NextResponse.json({ 
-      songs: songs,
-      hasMore,
-      total
-    });
+    try {
+      // Test database connection first
+      await prisma.$connect();
+      console.log("Database connection successful");
+      
+      // Get songs with pagination
+      const songs = await prisma.song.findMany({
+        where: whereClause,
+        orderBy: {
+          created_at: 'desc'
+        },
+        take: limit,
+        skip: skip
+      });
+      
+      console.log(`Successfully fetched ${songs.length} songs`);
+      
+      // Get the total count for statistics and pagination
+      const total = await prisma.song.count({
+        where: whereClause
+      });
+      
+      console.log(`Total songs count: ${total}`);
+      
+      // Calculate if there are more results
+      const hasMore = total > skip + songs.length;
+      
+      // Return using the exact format requested - raw database format
+      return NextResponse.json({ 
+        songs: songs,
+        hasMore,
+        total
+      });
+    } catch (dbError) {
+      console.error("Database error details:", dbError);
+      throw dbError; // Re-throw to be caught by the outer try-catch
+    }
   } catch (error) {
     console.error("Error fetching songs:", error);
-    return NextResponse.json({ error: "Failed to fetch songs", songs: [] }, { status: 500 });
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+    
+    // Check if it's a Prisma error and provide more details
+    if (error && typeof error === 'object' && 'name' in error) {
+      if (error.name === 'PrismaClientInitializationError') {
+        console.error("Prisma initialization error - check database connection string and credentials");
+      } else if (error.name === 'PrismaClientKnownRequestError' && 'code' in error && 'message' in error) {
+        console.error(`Prisma known request error - code: ${error.code}, message: ${error.message}`);
+      }
+    }
+    
+    return NextResponse.json({ 
+      error: "Failed to fetch songs", 
+      errorMessage: error instanceof Error ? error.message : String(error),
+      songs: [] 
+    }, { status: 500 });
+  } finally {
+    // Always disconnect to prevent connection pool issues
+    await prisma.$disconnect();
   }
 }
 

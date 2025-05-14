@@ -1,0 +1,27 @@
+Vercel CLI 41.7.6
+Fetching projects in nishu0s-projects
+> Projects found under nishu0s-projects  [2s]
+
+  Project Name                   Latest Production URL                                            Updated   Node Version   
+  thissongmeant                  https://thissongmeant-nishu0-nishu0s-projects.vercel.app         16s       22.x           
+  base-fellowship                https://base-fellowship.vercel.app                               11h       22.x           
+  coincurate-miniapp             https://coincurate-miniapp-nishu0s-projects.vercel.app           10d       22.x           
+  agent-wars-ui                  https://agent-wars-ui-nishu0s-projects.vercel.app                49d       22.x           
+  portfolio-new                  https://www.nisargthakkar.co                                     92d       20.x           
+  morphic-ai-answer              https://morphic-ai-answer-delta.vercel.app                       102d      22.x           
+  github-readme-streak-stats     https://github-readme-streak-stats-nishu0s-projects.vercel.app   103d      22.x           
+  anime-nft-marketplace-deploy   https://anime-nft-marketplace-deploy-nishu0.vercel.app           144d      16.x           
+  trend-trove                    https://trend-trove.vercel.app                                   146d      18.x           
+  onchain-ai                     https://onchain-ai-livid.vercel.app                              158d      22.x           
+  eth-global-bangkok-project     https://eth-global-bangkok-project-nishu0s-projects.vercel.app   179d      20.x           
+  arweave-web                    https://arweave-web-nishu0s-projects.vercel.app                  217d      20.x           
+  qiro-mono-qiro                 https://qiro-mono-qiro-three.vercel.app                          239d      20.x           
+  festive-flourish-fiesta        https://festive-flourish-fiesta.vercel.app                       296d      18.x           
+  codedex-story                  https://codedex-story.vercel.app                                 296d      18.x           
+  refrens-task                   https://refrens-task.vercel.app                                  296d      18.x           
+  nft-ui                         https://nft-ui-nishu0.vercel.app                                 296d      18.x           
+  nft-minter                     https://nft-minter-plum-rho.vercel.app                           296d      18.x           
+  hackmuscles                    https://hackmuscles.vercel.app                                   296d      18.x           
+  arweave-project                https://arweave-project.vercel.app                               296d      20.x           
+
+> To display the next page, run `vercel project ls --next 1721631689862`
