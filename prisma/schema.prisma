@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRESQL_DB")
+}
+
+model Song {
+  id          String   @id @default(uuid())
+  spotify_id  String
+  title       String
+  artist      String
+  album       String
+  album_cover String?
+  note        String   @db.Text
+  username    String
+  color       String?  @default("green")
+  spotify_url String?
+  created_at  DateTime @default(now())
+  user_id     String?
+  user_email  String?
+  likes       Int      @default(0)
+  user_likes  Boolean  @default(false)
+  zora_link   String?  // Link to Zora coin if minted
+  zora_tx     String?  // Transaction hash of the Zora coin minting
+  coin_address String? // Address of the minted coin
+
+  @@index([spotify_id])
+  @@index([user_id])
+  @@index([username])
+}
+
+model SongLike {
+  id       String   @id @default(uuid())
+  song_id  String
+  user_id  String
+  created_at DateTime @default(now())
+
+  @@unique([song_id, user_id])
+  @@index([song_id])
+  @@index([user_id])
+} 

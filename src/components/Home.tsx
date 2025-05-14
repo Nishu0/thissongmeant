@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "~/components/ui/Button";
-import { SongSearch, type SpotifyTrack } from "~/components/SongSearch";
-import SongMeaning from "~/components/SongMeaning";
-import SongWall from "~/components/SongWall";
-import AppLayout from "../AppLayout";
-import { useMiniKit } from "~/hooks/useMiniKit";
+import { Button } from "~/components/ui/button";
+import { SongSearch, type SpotifyTrack } from "../components/SongSearch";
+import SongMeaning from "./SongMeaning";
+import SongWall from "./SongWall";
+import { useFrame } from "./providers/FrameProvider";
 
 export default function Home() {
   const [selectedSong, setSelectedSong] = useState<SpotifyTrack | null>(null);
   const [showAddSong, setShowAddSong] = useState(false);
-  const { isSDKLoaded } = useMiniKit();
+  const { isSDKLoaded} = useFrame();
   
   console.log("DEBUG: Home component rendering, isSDKLoaded:", isSDKLoaded);
   
@@ -42,7 +41,6 @@ export default function Home() {
   console.log("DEBUG: Rendering full Home component");
   
   return (
-    <AppLayout>
       <div className="min-h-screen bg-black text-white pt-6 pb-16 px-4">
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-8">
@@ -85,6 +83,5 @@ export default function Home() {
           )}
         </div>
       </div>
-    </AppLayout>
   );
 }

@@ -137,3 +137,23 @@ export async function getFarcasterMetadata(): Promise<FrameManifest> {
     },
   };
 }
+
+// Debounce function to limit the rate at which a function can fire
+//ts-ignore
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  
+  return function(...args: Parameters<T>) {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+    
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
