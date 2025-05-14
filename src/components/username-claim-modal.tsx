@@ -1,20 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from "~/components/ui/button"
+import { Input } from "~/components/ui/input"
+import { saveUsername } from "~/lib/user"
 
 interface UsernameClaim {
   isOpen: boolean
-  onComplete: () => void
-  user: any // Current user data
+  onComplete: (username: string) => void
+  user: {
+    id: string
+    address: string
+    username?: string
+  }
 }
 
 export function UsernameClaimModal({ isOpen, onComplete, user }: UsernameClaim) {
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-//   const supabase = createClientComponentClient()
 
   if (!isOpen) return null
 
@@ -38,40 +42,44 @@ export function UsernameClaimModal({ isOpen, onComplete, user }: UsernameClaim) 
     }
 
     try {
-      // Check if username is taken
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('username')
-        .eq('username', username.toLowerCase())
-        .single()
-
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        throw checkError
+      // Check if username is taken via API
+      const checkResponse = await fetch(`/api/username/check?username=${encodeURIComponent(username.toLowerCase())}`)
+      const checkData = await checkResponse.json()
+      
+      if (!checkResponse.ok) {
+        throw new Error(checkData.error || 'Failed to check username')
       }
-
-      if (existingUser) {
+      
+      if (checkData.taken) {
         setError('This username is already taken')
         setIsLoading(false)
         return
       }
 
-      // Create or update user record with chosen username
-      const { error: updateError } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: user.email,
+      // Save username via API
+      const saveResponse = await fetch('/api/username/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           username: username.toLowerCase(),
-          full_name: user.user_metadata.full_name
-        })
-
-      if (updateError) throw updateError
-
-      // Call onComplete callback
-      await onComplete()
+          walletAddress: user.address,
+          userId: user.id
+        }),
+      })
       
-      // Redirect to the user's profile page
-      window.location.href = `/${username.toLowerCase()}`
+      const saveData = await saveResponse.json()
+      
+      if (!saveResponse.ok) {
+        throw new Error(saveData.error || 'Failed to save username')
+      }
+
+      // Save username to localStorage for client-side usage
+      saveUsername(username.toLowerCase())
+      
+      // Call onComplete callback with the new username
+      onComplete(username.toLowerCase())
     } catch (error) {
       console.error('Error claiming username:', error)
       setError('Failed to claim username. Please try again.')
@@ -88,28 +96,34 @@ export function UsernameClaimModal({ isOpen, onComplete, user }: UsernameClaim) 
           This will be your unique profile URL and how others find you.
         </p>
 
+        {/* Display wallet address information */}
+        <div className="mb-4 rounded-md bg-gray-100 p-3 text-sm">
+          <p className="text-gray-700">
+            <span className="font-medium">Wallet:</span>{' '}
+            {user.address.substring(0, 6)}...{user.address.substring(user.address.length - 4)}
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <div className="mb-2">
               <label htmlFor="username" className="text-sm text-gray-600">
                 Your profile will be at:
               </label>
-              <div className="mt-1 flex items-center rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                <div className="flex items-center text-sm text-gray-500">
-                  <span>thissongmeant.com/</span>
-                  <input
-                    id="username"
-                    type="text"
-                    placeholder="Enter username"
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value)
-                      setError('')
-                    }}
-                    className="h-12 text-base"
-                    disabled={isLoading}
-                  />
-                </div>
+              <div className="mt-1 flex items-center rounded-md bg-gray-50 px-3 py-2">
+                <span className="text-sm text-gray-500">thissongmeant.com/</span>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Enter username"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value)
+                    setError('')
+                  }}
+                  className="border-0 bg-transparent focus-visible:ring-0"
+                  disabled={isLoading}
+                />
               </div>
             </div>
             

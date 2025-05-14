@@ -553,13 +553,13 @@ export default function Home() {
       )}
 
       {/* Simple footer */}
-      <footer className="px-4 py-4 md:py-6 text-center text-sm text-[#666] font-sans">
+      {/* <footer className="px-4 py-4 md:py-6 text-center text-sm text-[#666] font-sans">
         <div className="container mx-auto">
           <p>
             A CultureWare Product.
           </p>
         </div>
-      </footer>
+      </footer> */}
     </div>
   )
 }
