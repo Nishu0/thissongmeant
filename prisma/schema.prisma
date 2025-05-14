@@ -12,20 +12,20 @@ datasource db {
 
 model Song {
   id          String   @id @default(uuid())
-  spotify_id  String
-  title       String
-  artist      String
-  album       String
-  album_cover String?
-  note        String   @db.Text
-  username    String
-  color       String?  @default("green")
-  spotify_url String?
-  created_at  DateTime @default(now())
-  user_id     String?
-  user_email  String?
-  likes       Int      @default(0)
-  user_likes  Boolean  @default(false)
+  spotify_id  String   // Spotify track ID
+  title       String   // Song title
+  artist      String   // Artist name
+  album       String   // Album name
+  album_cover String?  // URL to album cover image
+  note        String   @db.Text // User's note/meaning for this song
+  username    String   // Display name of the user who posted this
+  color       String   @default("green") // Color theme for the card
+  spotify_url String?  // Link to this song on Spotify
+  created_at  DateTime @default(now()) // When the song was added
+  user_id     String   // Wallet address or random UUID for anonymous users
+  user_email  String?  // Deprecated - kept for backward compatibility
+  likes       Int      @default(0) // Number of likes
+  user_likes  Boolean  @default(false) // Whether the current user has liked it
   zora_link   String?  // Link to Zora coin if minted
   zora_tx     String?  // Transaction hash of the Zora coin minting
   coin_address String? // Address of the minted coin
@@ -36,12 +36,16 @@ model Song {
 }
 
 model SongLike {
-  id       String   @id @default(uuid())
-  song_id  String
-  user_id  String
+  id         String   @id @default(uuid())
+  song_id    String   // References Song.id
+  user_id    String   // Wallet address or random UUID
   created_at DateTime @default(now())
 
   @@unique([song_id, user_id])
   @@index([song_id])
   @@index([user_id])
-} 
+}
+
+// Users are identified by their wallet address 
+// No separate User model is needed as the user_id in Song and SongLike
+// is the wallet address of the user 

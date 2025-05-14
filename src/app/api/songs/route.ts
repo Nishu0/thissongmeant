@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "~/lib/prisma";
 
-// Get all song meanings
+// Get all songs
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const songId = searchParams.get('songId') || undefined;
     const userId = searchParams.get('userId') || undefined;
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const skip = (page - 1) * limit;
     
     let whereClause = {};
     
@@ -26,57 +29,54 @@ export async function GET(request: NextRequest) {
       };
     }
     
-    // Get all songs with the specified filters
+    // Get songs with pagination
     const songs = await prisma.song.findMany({
       where: whereClause,
       orderBy: {
         created_at: 'desc'
       },
-      take: 50 // Limit to 50 results
+      take: limit,
+      skip: skip
     });
     
-    // Get the total count for statistics
-    const count = await prisma.song.count();
+    // Get the total count for statistics and pagination
+    const total = await prisma.song.count({
+      where: whereClause
+    });
     
-    // Transform the data to match the expected format
-    const meanings = songs.map(song => ({
-      id: song.id,
-      songId: song.spotify_id,
-      songName: song.title,
-      artistName: song.artist,
-      albumImageUrl: song.album_cover,
-      meaning: song.note,
-      username: song.username,
-      userId: song.user_id,
-      likes: song.likes,
-      createdAt: song.created_at.toISOString(),
-      zoraLink: song.zora_link,
-      coinAddress: song.coin_address
-    }));
+    // Calculate if there are more results
+    const hasMore = total > skip + songs.length;
     
-    return NextResponse.json({ meanings, count });
+    // Return using the exact format requested - raw database format
+    return NextResponse.json({ 
+      songs: songs,
+      hasMore,
+      total
+    });
   } catch (error) {
-    console.error("Error fetching meanings:", error);
-    return NextResponse.json({ error: "Failed to fetch meanings" }, { status: 500 });
+    console.error("Error fetching songs:", error);
+    return NextResponse.json({ error: "Failed to fetch songs", songs: [] }, { status: 500 });
   }
 }
 
-// Add a new song meaning
+// Add a new song
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
+    // Extract data with field mappings
     const {
-      songId,
-      songName,
-      artistName,
-      albumName = "", // Default to empty string if not provided
-      albumImageUrl,
-      meaning,
+      id: songId,
+      title: songName,
+      artist: artistName,
+      album: albumName = "", 
+      albumCover: albumImageUrl,
+      note: meaning,
       username,
-      userId,
-      userEmail,
-      spotifyUrl
+      userId, // This should be the wallet address
+      walletAddress, // Alternative wallet address field
+      spotifyUrl,
+      color = "green" // Default color
     } = data;
     
     // Validate required fields
@@ -84,7 +84,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
     
-    // Create the new song meaning in the database
+    // Use wallet address as user_id when available, otherwise use provided userId or generate random
+    const userWalletId = walletAddress || userId || crypto.randomUUID();
+    
+    // Create the new song in the database
     const song = await prisma.song.create({
       data: {
         spotify_id: songId,
@@ -94,31 +97,19 @@ export async function POST(request: NextRequest) {
         album_cover: albumImageUrl,
         note: meaning,
         username: username || "Anonymous",
-        user_id: userId,
-        user_email: userEmail,
+        user_id: userWalletId,
+        user_email: null, // No longer using email
         spotify_url: spotifyUrl,
+        color: color,
         likes: 0,
         user_likes: false
       }
     });
     
-    // Transform to expected response format
-    const response = {
-      id: song.id,
-      songId: song.spotify_id,
-      songName: song.title,
-      artistName: song.artist,
-      albumImageUrl: song.album_cover,
-      meaning: song.note,
-      username: song.username,
-      userId: song.user_id,
-      likes: song.likes,
-      createdAt: song.created_at.toISOString()
-    };
-    
-    return NextResponse.json(response, { status: 201 });
+    // Return the raw song object directly
+    return NextResponse.json(song, { status: 201 });
   } catch (error) {
-    console.error("Error adding meaning:", error);
-    return NextResponse.json({ error: "Failed to add meaning" }, { status: 500 });
+    console.error("Error adding song:", error);
+    return NextResponse.json({ error: "Failed to add song" }, { status: 500 });
   }
 } 

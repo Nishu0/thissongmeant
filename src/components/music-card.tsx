@@ -4,18 +4,27 @@ import { useState, useEffect } from "react"
 import { Heart } from "lucide-react"
 import { Button } from "./ui/button"
 import { getUserId } from "~/lib/user"
+import Link from 'next/link'
 
 interface Song {
   id: string
+  spotify_id?: string
   title: string
   artist: string
-  album_cover: string
-  note: string
+  album_cover?: string
+  note?: string
   username: string
-  likes: number
+  user_id?: string
+  likes?: number
   color?: string
   spotify_url?: string
-  user_likes: boolean
+  user_likes?: boolean
+  // Keep these for backward compatibility
+  songName?: string
+  artistName?: string
+  albumImageUrl?: string
+  meaning?: string
+  songId?: string
 }
 
 interface MusicCardProps {
@@ -29,6 +38,7 @@ export function MusicCard({ song }: MusicCardProps) {
   const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
+    // Support both the new DB field names and the old transformed names
     setLikes(song.likes || 0)
     setHasLiked(song.user_likes || false)
   }, [song.likes, song.user_likes])
@@ -40,8 +50,21 @@ export function MusicCard({ song }: MusicCardProps) {
       setIsUpdating(true)
       const userId = getUserId()
       // Optimistic update
-      setHasLiked(!hasLiked)
-      setLikes(prev => hasLiked ? prev - 1 : prev + 1)
+      const newLikedState = !hasLiked
+      setHasLiked(newLikedState)
+      setLikes(prev => newLikedState ? prev + 1 : prev - 1)
+
+      // Update localStorage
+      const savedLikes = localStorage.getItem('likedSongs')
+      const likedSongs = new Set<string>(savedLikes ? JSON.parse(savedLikes) : [])
+      
+      if (newLikedState) {
+        likedSongs.add(song.id)
+      } else {
+        likedSongs.delete(song.id)
+      }
+      
+      localStorage.setItem('likedSongs', JSON.stringify([...likedSongs]))
 
       const response = await fetch(`/api/songs/${song.id}/like`, {
         method: 'POST',
@@ -58,9 +81,18 @@ export function MusicCard({ song }: MusicCardProps) {
       const { liked } = await response.json()
       
       // Update state if the server response differs from our optimistic update
-      if (liked !== !hasLiked) {
+      if (liked !== newLikedState) {
         setHasLiked(liked)
         setLikes(prev => liked ? prev + 1 : prev - 1)
+        
+        // Update localStorage to match server state
+        const updatedLikedSongs = new Set<string>(savedLikes ? JSON.parse(savedLikes) : [])
+        if (liked) {
+          updatedLikedSongs.add(song.id)
+        } else {
+          updatedLikedSongs.delete(song.id)
+        }
+        localStorage.setItem('likedSongs', JSON.stringify([...updatedLikedSongs]))
       }
     } catch (error) {
       console.error('Error updating like:', error)
@@ -79,7 +111,23 @@ export function MusicCard({ song }: MusicCardProps) {
     return (seed % 5) - 2 // Range from -2 to 2 degrees
   }
 
-  // Get a realistic album cover image based on artist nam
+  // Function to get consistent field values regardless of field naming
+  const getTitle = () => song.title || song.songName || '';
+  const getArtist = () => song.artist || song.artistName || '';
+  const getNote = () => song.note || song.meaning || '';
+  const getAlbumCover = () => song.album_cover || song.albumImageUrl || "https://i1.scdn.co/image/ab67616d00001e02b8c4be2e3c14d6fa28f7bc7b";
+  const getSpotifyUrl = () => song.spotify_url || 
+    `https://open.spotify.com/search/${encodeURIComponent(getTitle() + " " + getArtist())}`;
+
+  // Add function to format wallet addresses
+  const formatUsername = (username: string) => {
+    // Check if it looks like a wallet address (0x followed by 40 hex chars)
+    if (/^0x[a-fA-F0-9]{40}$/.test(username)) {
+      // Format as 0x1234...5678
+      return `${username.substring(0, 6)}...${username.substring(username.length - 4)}`;
+    }
+    return username;
+  };
 
   return (
     <div
@@ -94,24 +142,22 @@ export function MusicCard({ song }: MusicCardProps) {
         <div className="mb-3 md:mb-4 flex items-center gap-3">
           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-sm bg-gray-100 relative">
             <img
-              src={song.album_cover || "https://i1.sndcdn.com/artworks-000116795481-6fmihq-t500x500.jpg"}
-              alt={`${song.title} by ${song.artist}`}
+              src={getAlbumCover()}
+              alt={`${getTitle()} by ${getArtist()}`}
               className="h-full w-full object-cover"
               loading="lazy"
             />
           </div>
           <div className="flex-1">
-            <h3 className="text-base md:text-lg font-bold font-instrument text-gray-900">{song.title}</h3>
-            <p className="text-sm text-gray-400">{song.artist}</p>
+            <h3 className="text-base md:text-lg font-bold font-instrument text-gray-900">{getTitle()}</h3>
+            <p className="text-sm text-gray-400">{getArtist()}</p>
           </div>
           <a
-            href={
-              song.spotify_url || `https://open.spotify.com/search/${encodeURIComponent(song.title + " " + song.artist)}`
-            }
+            href={getSpotifyUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center h-6 w-6 rounded-full bg-[#1DB954] text-white hover:bg-[#1ed760] transition-colors"
-            aria-label={`Listen to ${song.title} on Spotify`}
+            aria-label={`Listen to ${getTitle()} on Spotify`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -128,12 +174,18 @@ export function MusicCard({ song }: MusicCardProps) {
 
         {/* Note */}
         <p className="mb-3 text-sm leading-relaxed text-gray-800 font-satoshi">
-          {song.note}
+          {getNote()}
         </p>
 
         {/* Username and likes */}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">- {song.username}</span>
+          <Link 
+            href={`/${song.username}`} 
+            className="text-xs text-gray-500 hover:text-gray-700 hover:underline transition-colors"
+            title={song.username}
+          >
+            - {formatUsername(song.username)}
+          </Link>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
