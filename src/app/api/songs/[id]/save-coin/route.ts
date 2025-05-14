@@ -23,7 +23,7 @@ export async function POST(
       where: { id: songId },
       data: {
         coin_address: coinAddress,
-        zora_link: `https://zora.co/base/tokens/${coinAddress}`
+        zora_link: `https://zora.co/coin/base:${coinAddress}`
       },
     });
 

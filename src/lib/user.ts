@@ -26,6 +26,11 @@ export function getWalletAddress(): string | null {
   return localStorage.getItem('wallet_address');
 }
 
+// Check if user has a wallet connected
+export function hasWalletConnected(): boolean {
+  return !!getWalletAddress();
+}
+
 // Get current user with wallet if available
 export function getCurrentUser(): WalletUser | null {
   const userId = getUserId();

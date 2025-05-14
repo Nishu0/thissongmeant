@@ -9,7 +9,6 @@ import { Plus } from "lucide-react"
 import axios from "axios"
 import { getUserId, getCurrentUser, saveWalletConnection } from "~/lib/user"
 import { LoadingSkeleton } from "~/components/loading-skeleton"
-import { SiteBanner } from "~/components/site-banner"
 import Link from "next/link"
 import { useAccount, useConnect } from 'wagmi'
 
@@ -85,16 +84,46 @@ const WalletLink = ({ address, username, showIcon = true, className = "" }: Wall
 };
 
 const WalletConnectButton = () => {
-  const { isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
 
   if (isConnected) {
     return null; // Don't show button if already connected
   }
 
   return (
-    <div onClick={() => connect({ connector: connectors[0] })} style={{ cursor: 'pointer' }}>
-      <SiteBanner message="👉 Connect your wallet to build your music scrapbook. 👈" />
+    <div className="flex flex-col gap-2 p-3 bg-blue-50 rounded-lg">
+      <p className="text-center text-sm font-medium text-blue-700 mb-2">
+        Connect a wallet to build your music scrapbook
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        {/* For Farcaster Frame environment, use the first connector */}
+        {window.farcaster?.sdk && (
+          <Button 
+            onClick={() => connect({ connector: connectors[0] })}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            Connect with Farcaster
+          </Button>
+        )}
+        
+        {/* For web environment, show multiple options */}
+        {!window.farcaster?.sdk && (
+          <>
+            {connectors.map((connector) => (
+              <Button
+                key={connector.uid}
+                onClick={() => connect({ connector })}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {connector.name === 'MetaMask' ? 'Connect MetaMask' : 
+                 connector.name === 'Coinbase Wallet' ? 'Connect Coinbase' : 
+                 'Connect Wallet'}
+              </Button>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -180,31 +209,13 @@ export default function Home() {
         const currentUser = getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
-        } else {
-          // Ensure there's always a valid user ID even for anonymous users
-          ensureUserIdExists();
         }
+        // No longer creating anonymous users automatically
       }
     };
     
     checkFarcasterContext();
   }, []);
-
-  // Helper function to ensure user has an ID
-  function ensureUserIdExists() {
-    let userId = getUserId();
-    if (!userId) {
-      userId = `anonymous_${crypto.randomUUID()}`;
-      localStorage.setItem('user_id', userId);
-    }
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      // Create a minimal user with the generated ID
-      const user = saveWalletConnection(userId);
-      setUser(user);
-    }
-    return userId;
-  }
 
   const fetchSongs = async (page: number, append = false) => {
     try {
@@ -286,33 +297,30 @@ export default function Home() {
 
   const handleAddStory = async (newStory: any) => {
     try {
-      const userId = getUserId()
-      const walletUser = getCurrentUser()
+      const userId = getUserId(); // This is just a user ID, not a wallet address
+      const walletUser = getCurrentUser(); // This will be null if no wallet connected
       
-      // Update the URL to the correct endpoint for adding songs
+      // Only include wallet address if the user actually has a connected wallet
       const response = await axios.post('/api/songs/add', {
         ...newStory,
-        userId,
-        walletAddress: walletUser?.address
-      })
+        userId, 
+        walletAddress: walletUser?.address // Will be undefined if no wallet connected
+      });
       
       if (response.status !== 200) {
-        throw new Error('Failed to save song')
+        throw new Error('Failed to save song');
       }
 
-      const savedSong = response.data
+      const savedSong = response.data;
 
       // Add the new song to the stories list
-      setStories(prevStories => [savedSong, ...prevStories])
-      setTotalSongs(prev => prev + 1)
+      setStories(prevStories => [savedSong, ...prevStories]);
+      setTotalSongs(prev => prev + 1);
       
       // Return the saved song data so the AddSongModal can show success state
       return savedSong;
-      
-      // DON'T close the modal here - let the AddSongModal handle its own state
-      // The modal will show success options for sharing and minting
     } catch (error) {
-      console.error('Error saving song:', error)
+      console.error('Error saving song:', error);
       throw error; // Rethrow so the modal can handle the error
     }
   }

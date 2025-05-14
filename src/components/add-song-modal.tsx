@@ -255,8 +255,13 @@ export function AddSongModal({
     
     try {
       // Create text for Farcaster
-      const username = farcasterUser?.username || user?.username || 'anonymous';
-      const text = `I shared what "${songDetails.title}" by ${songDetails.artist} means to me:\n\n"${note}"\n\nCheck it out on ThisSongMeant! ${window.location.origin}/${username}`;
+      // Use Farcaster username, or wallet address, or savedSong.username in that order of preference
+      const username = farcasterUser?.username || user?.address || savedSong.username || 'anonymous';
+      
+      // Use the actual username or wallet address in the URL instead of using savedSong.id
+      const profileUrl = `${window.location.origin}/${username}`;
+      
+      const text = `I shared what "${songDetails.title}" by ${songDetails.artist} means to me:\n\n"${note}"\n\nCheck it out on ThisSongMeant! ${profileUrl}`;
       
       // Open Warpcast in a new window (or other Farcaster clients)
       const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
@@ -348,30 +353,46 @@ export function AddSongModal({
               </Button>
               
               {!zoraSuccess ? (
-                <Button
-                  onClick={mintZoraCoin}
-                  className="w-full flex items-center justify-center gap-2 bg-pink-600 hover:bg-pink-700 text-white"
-                  disabled={isZoraMinting || isPending || !address}
-                >
-                  {isZoraMinting || isPending ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                      Minting...
-                    </>
+                <div>
+                  {!isConnected ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600 mb-2">
+                        Connect your wallet to mint this as a Zora coin
+                      </p>
+                      <Button
+                        onClick={() => connect({ connector: connectors[0] })}
+                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Connect Wallet to Mint
+                      </Button>
+                    </div>
                   ) : (
-                    <>
-                      <Coins size={16} />
-                      Mint as Zora Coin
-                    </>
+                    <Button
+                      onClick={mintZoraCoin}
+                      className="w-full flex items-center justify-center gap-2 bg-pink-600 hover:bg-pink-700 text-white"
+                      disabled={isZoraMinting || isPending || !address}
+                    >
+                      {isZoraMinting || isPending ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Minting...
+                        </>
+                      ) : (
+                        <>
+                          <Coins size={16} />
+                          Mint as Zora Coin
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </div>
               ) : (
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-800 mb-1">
                     <span className="font-medium">Coin minted successfully!</span>
                   </p>
                   <a 
-                    href={`https://zora.co/base/tokens/${zoraCoinAddress}`}
+                    href={`https://zora.co/coin/base:${zoraCoinAddress}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline"
@@ -379,12 +400,6 @@ export function AddSongModal({
                     View your coin on Zora
                   </a>
                 </div>
-              )}
-              
-              {!address && (
-                <p className="text-xs text-red-500 mt-1">
-                  Connect your wallet to mint a Zora coin.
-                </p>
               )}
             </div>
             

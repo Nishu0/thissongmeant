@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "~/components/ui/Button";
+import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { SpotifyTrack } from "./SongSearch";
-import { useAccount } from 'wagmi';
-import { WalletConnect } from "./WalletConnect";
+import { useAccount, useConnect } from 'wagmi';
 
 interface SongMeaningProps {
   song: SpotifyTrack;
@@ -21,6 +20,7 @@ export default function SongMeaning({ song, onBack }: SongMeaningProps) {
   const [coinAddress, setCoinAddress] = useState<string | null>(null);
   const [zoraLink, setZoraLink] = useState<string | null>(null);
   const { isConnected, address } = useAccount();
+  const { connect, connectors } = useConnect();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -142,8 +142,13 @@ export default function SongMeaning({ song, onBack }: SongMeaningProps) {
                 <p className="text-sm mb-2">Want to mint your meaning as a Zora coin?</p>
                 {!isConnected ? (
                   <div className="flex flex-col items-center gap-4">
-                    <p className="text-xs text-zinc-400">You need to connect your wallet first</p>
-                    <WalletConnect />
+                    <p className="text-xs text-zinc-400">Connect your wallet to mint</p>
+                    <Button 
+                      onClick={() => connect({ connector: connectors[0] })}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Connect Wallet
+                    </Button>
                   </div>
                 ) : (
                   <Button 
@@ -178,7 +183,7 @@ export default function SongMeaning({ song, onBack }: SongMeaningProps) {
                     </a>
                   ) : coinAddress && (
                     <a
-                      href={`https://zora.co/base/tokens/${coinAddress}`}
+                      href={`https://zora.co/coin/base:${coinAddress}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-400 hover:text-blue-300 underline"

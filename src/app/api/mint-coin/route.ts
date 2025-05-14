@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       mintingPrivateKey as Hex
     );
 
-    // Create Zora link from the coin address
-    const zoraLink = `https://zora.co/base/tokens/${result.coinAddress}`;
+    // Create Zora link from the coin address - updated format
+    const zoraLink = `https://zora.co/coin/base:${result.coinAddress}`;
 
     // Update the song in the database with Zora information
     await prisma.song.update({

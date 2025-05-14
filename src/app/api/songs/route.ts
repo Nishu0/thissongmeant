@@ -37,12 +37,9 @@ export async function GET(request: NextRequest) {
       await prisma.$connect();
       console.log("Database connection successful");
       
-      // Get songs with pagination
+      // Get songs with pagination - removing the filter for null user_ids
       const songs = await prisma.song.findMany({
-        where: {
-          ...whereClause,
-          user_id: { not: null } // Filter out null user_ids
-        },
+        where: whereClause, // Removed the user_id: { not: null } filter
         orderBy: {
           created_at: 'desc'
         },
@@ -124,6 +121,23 @@ export async function POST(request: NextRequest) {
     // Use wallet address as user_id when available, otherwise use provided userId or generate random
     const userWalletId = walletAddress || userId || crypto.randomUUID();
     
+    // Prefer the Farcaster username or wallet address as the displayable username
+    // If a username wasn't provided and it looks like a UUID, use the wallet address instead
+    let displayUsername = username;
+    
+    // If username is missing or looks like a UUID, use the wallet address as username
+    if (!displayUsername || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(displayUsername)) {
+      if (userWalletId.startsWith('farcaster_')) {
+        // For Farcaster users, use "farcaster_user" if no username provided
+        displayUsername = "farcaster_user";
+      } else if (userWalletId.startsWith('0x')) {
+        // For wallet addresses, use the address as the username
+        displayUsername = userWalletId;
+      } else {
+        displayUsername = "Anonymous";
+      }
+    }
+    
     // Create the new song in the database
     const song = await prisma.song.create({
       data: {
@@ -133,7 +147,7 @@ export async function POST(request: NextRequest) {
         album: albumName,
         album_cover: albumImageUrl,
         note: meaning,
-        username: username || "Anonymous",
+        username: displayUsername,
         user_id: userWalletId,
         user_email: null, // No longer using email
         spotify_url: spotifyUrl,
