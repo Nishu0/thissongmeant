@@ -159,15 +159,14 @@ export default function Home() {
   useEffect(() => {
     const checkFarcasterContext = () => {
       // Check if Farcaster SDK is available
-      if (typeof window !== 'undefined' && window.farcaster && window.farcaster.sdk && window.farcaster.sdk.context) {
-        // If user context is available, use it for authentication
+      if (typeof window !== 'undefined' && window.farcaster?.sdk?.context?.user) {
         const farcasterUser = window.farcaster.sdk.context.user;
         if (farcasterUser && farcasterUser.fid) {
-          // Create wallet address from FID
-          const walletAddress = `0x${farcasterUser.fid.toString(16).padStart(40, '0')}`;
+          // Create a consistent, never-null user_id from FID
+          const userId = `farcaster_${farcasterUser.fid}`;
           
-          // Save Farcaster user info in localStorage
-          const savedUser = saveWalletConnection(walletAddress, {
+          // Save Farcaster user info in localStorage with consistent ID
+          const savedUser = saveWalletConnection(userId, {
             fid: farcasterUser.fid,
             username: farcasterUser.username,
             displayName: farcasterUser.displayName,
@@ -179,12 +178,33 @@ export default function Home() {
       } else {
         // Fallback to localStorage if Farcaster context not available
         const currentUser = getCurrentUser();
-        setUser(currentUser);
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          // Ensure there's always a valid user ID even for anonymous users
+          ensureUserIdExists();
+        }
       }
     };
     
     checkFarcasterContext();
   }, []);
+
+  // Helper function to ensure user has an ID
+  function ensureUserIdExists() {
+    let userId = getUserId();
+    if (!userId) {
+      userId = `anonymous_${crypto.randomUUID()}`;
+      localStorage.setItem('user_id', userId);
+    }
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      // Create a minimal user with the generated ID
+      const user = saveWalletConnection(userId);
+      setUser(user);
+    }
+    return userId;
+  }
 
   const fetchSongs = async (page: number, append = false) => {
     try {

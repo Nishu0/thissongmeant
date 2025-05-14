@@ -39,7 +39,10 @@ export async function GET(request: NextRequest) {
       
       // Get songs with pagination
       const songs = await prisma.song.findMany({
-        where: whereClause,
+        where: {
+          ...whereClause,
+          user_id: { not: null } // Filter out null user_ids
+        },
         orderBy: {
           created_at: 'desc'
         },

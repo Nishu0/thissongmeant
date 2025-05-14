@@ -42,6 +42,28 @@ export function createSongMeaningMetadata(data: {
   }
 }
 
+// Function to upload metadata to IPFS
+export async function uploadMetadataToIPFS(metadata: any): Promise<string> {
+  try {
+    const response = await fetch('/api/upload-to-ipfs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`IPFS upload failed: ${errorData.message || response.statusText}`);
+    }
+    
+    const { uri } = await response.json();
+    return uri;
+  } catch (error) {
+    console.error('Error uploading metadata to IPFS:', error);
+    throw error;
+  }
+}
+
 // Generate parameters for creating a song meaning coin with Wagmi
 export async function generateSongCoinParams(data: {
   songName: string;
@@ -54,6 +76,9 @@ export async function generateSongCoinParams(data: {
   // Create metadata
   const metadata = createSongMeaningMetadata(data);
   
+  // Upload metadata to IPFS
+  const metadataUri = await uploadMetadataToIPFS(metadata);
+  
   // Generate a symbol (up to 5 chars) based on song name + artist
   const symbolBase = `${data.songName}${data.artistName}`
     .replace(/[^a-zA-Z0-9]/g, '')
@@ -64,7 +89,7 @@ export async function generateSongCoinParams(data: {
   const coinParams = {
     name: `${data.songName} by ${data.artistName}`,
     symbol,
-    uri: `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`,
+    uri: metadataUri, // Use IPFS URI instead of data URI
     payoutRecipient: data.walletAddress,
     initialPurchaseWei: 0n,
   };
@@ -95,16 +120,29 @@ export async function mintContentCoin(
   // Get the account address
   const [address] = await walletClient.getAddresses();
 
-  // Create coin parameters
-  const coinParams = {
-    name: coinName,
-    symbol: coinSymbol,
-    uri: `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`,
-    payoutRecipient: address as Address,
-    initialPurchaseWei: 0n,
-  };
-
   try {
+    // Upload metadata to IPFS first
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/upload-to-ipfs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to upload metadata to IPFS');
+    }
+    
+    const { uri } = await response.json();
+
+    // Create coin parameters
+    const coinParams = {
+      name: coinName,
+      symbol: coinSymbol,
+      uri, // Use IPFS URI
+      payoutRecipient: address as Address,
+      initialPurchaseWei: 0n,
+    };
+
     // Create the coin
     const result = await createCoin(coinParams, walletClient, publicClient);
     
